@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software or data, please cite both the paper and this repository."
+title: "Cynomolgus proteome half-life analysis pipeline"
+abstract: >-
+  Reproducible analysis of protein half-life in the cynomolgus monkey proteome
+  (n = 3,514), testing sequence-feature, paralogy and protein-complex predictors
+  of turnover. Includes a NumPy-only statistical re-implementation, frozen
+  snapshots of every external database dependency, an acceptance table, and an
+  interactive Streamlit application.
+type: software
+authors:
+  - family-names: "Kosugi"
+    given-names: "Youhei"
+    affiliation: "Preclinical Biomarkers, Takeda Pharmaceutical Company Limited"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"   # TODO add ORCID
+# TODO: add remaining authors before submission.
+license: MIT
+keywords:
+  - proteomics
+  - protein half-life
+  - protein turnover
+  - cynomolgus monkey
+  - Macaca fascicularis
+  - CORUM
+  - paralogs
+  - reproducibility
+# TODO: complete on release -- tag the repo and archive via Zenodo for a DOI.
+version: "2.1.0"
+date-released: "2026-08-31"
+# doi: "10.5281/zenodo.XXXXXXX"
+# repository-code: "https://github.com/<org>/<repo>"

@@ -1,0 +1,13 @@
+# Runtime for the Streamlit app.
+#
+# The ANALYSIS itself needs only NumPy: every statistic (ranks, Spearman,
+# tie-corrected Mann-Whitney, Cliff's delta, OLS, Student-t p) is re-implemented
+# in code/stats_numpy.py. Do NOT add SciPy -- published values are pinned to
+# these implementations and swapping in SciPy is not guaranteed to reproduce them.
+#
+# matplotlib is required only by the fig_*.py scripts.
+# streamlit is required only by app.py.
+
+numpy>=2.0
+matplotlib>=3.8
+streamlit>=1.39      # x_label/y_label on st.bar_chart/st.line_chart need 1.39+

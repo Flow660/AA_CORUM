@@ -1,0 +1,6 @@
+Identity threshold (%)	Coverage threshold (%)	Families (size>=3)	Proteins in families	Median within-family SD of log10(t1/2)	Median random-set SD of log10(t1/2)	Permutation P value
+30	50	166	923	0.211	0.271	< 1e-03
+50	50	84	321	0.152	0.258	< 1e-03
+60	50	59	202	0.138	0.248	< 1e-03
+70	50	32	103	0.097	0.245	< 1e-03
+80	50	11	37	0.139	0.247	0.0084

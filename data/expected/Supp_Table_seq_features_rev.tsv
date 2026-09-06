@@ -1,0 +1,9 @@
+feature	type	n	spearman_rho	spearman_p	OLS_beta	OLS_SE	OLS_p
+log10(length)	continuous	3514	-0.0633	1.721e-04	-0.0051	0.0061	4.042e-01
+pI	continuous	3514	+0.1083	1.182e-10	+0.0380	0.0062	1.071e-09
+Disorder fraction	continuous	3514	-0.0511	2.461e-03	-0.0294	0.0060	1.111e-06
+PEST max	continuous	3514	-0.1008	2.066e-09	-0.0028	0.0060	6.460e-01
+N-end TYPE1 (R/K/H)	binary	3514	+0.0364	3.085e-02	+0.1628	0.0809	4.413e-02
+N-end TYPE2 (L/F/W/Y/I)	binary	3514	+0.0044	7.957e-01	+0.0143	0.0748	8.479e-01
+N-end NDEG (D/E/N/Q)	binary	3514	+0.0359	3.311e-02	+0.1933	0.0972	4.677e-02
+WHOLE_MODEL	OLS	3514	NA	NA	R2=0.0190	NA	NA

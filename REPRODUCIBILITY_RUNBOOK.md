@@ -1,0 +1,392 @@
+# Cyno proteome half-life pipeline — Reproducibility Runbook (v2)
+
+**Owner:** Kosugi, Youhei (Director, Preclinical Biomarkers, Takeda)
+**Supersedes:** `Cyno_pipeline_runbook.pdf` (v1, prose-only methods guide)
+**Purpose:** survive a Copilot Cowork refresh (which wipes `input/` and `working/`)
+and reproduce Tier 1-1 … 1-6 **numerically**, not just methodologically.
+
+---
+
+## 0. Why v1 (the PDF alone) is not enough
+
+The v1 PDF is an excellent *methods* description, but a prose guide cannot
+guarantee that the **same numbers** come back, because:
+
+1. **The analysis code was never saved.** v1 keeps scripts in `working/` and only
+   final outputs in `output/`; a refresh wipes `working/`. Re-deriving code from
+   prose drifts on details the prose does not pin (exact feature set, the ~50
+   complex-name regexes, rank tie-handling, the permutation sampling universe).
+2. **The published feature set is *smaller* than the prose list.** v1 Tier 1-4
+   lists MW, GRAVY, instability index, TM count, etc., but the *actual* model that
+   produced R² = 0.0190 used only: log10(length), pI, disorder fraction, PEST max,
+   and three N-end dummies. Building from the prose list does **not** reproduce
+   R² = 0.0190.
+3. **Live databases drift.** v1 fetches UniProt features / GO / DisGeNET at run
+   time; those change daily, so identical code gives different numbers on a later
+   date unless the pulled annotations are frozen.
+4. **Underspecified knobs + stale intermediates.** Examples this pack uncovered:
+   the permutation null in Tier 1-5 samples from the **whole cohort** (not the
+   member subset) — unstated in v1; the Tier 1-1 outlier set needs a coverage cut
+   the prose omits; and the saved Tier 1-1 pair table was built on the **older
+   3,515-row cohort**, so it still carries the ambiguous `Mrc1;Slc39A12` row that
+   the rev result excludes. All three are now pinned/handled in code.
+
+**This pack closes 1–4 by shipping the code, the pinned inputs, and frozen
+snapshots of every external dependency, plus an acceptance table.**
+
+---
+
+## 1. What a Cowork refresh keeps vs. wipes
+
+| Location | Refresh behaviour | Contents |
+|---|---|---|
+| `output/` → OneDrive `Documents/Cowork` | **synced out; recoverable** | results, figures, this pack, the derived cohort |
+| `input/` | **wiped** | raw uploads: `Monkey_half-life.xlsx`, `corum_humanComplexes.txt`, `Cyno.fasta`, DIAMOND `pairs.tsv` |
+| `working/` | **wiped** | analysis scripts + intermediates (this is where v1's code was lost) |
+
+> ⚠️ The pack survives **only because it lives in `output/`**. Keep a local copy
+> too — if a refresh is ever configured to also clear the OneDrive Cowork folder,
+> the synced copy is your only backup. Confirm your refresh policy.
+
+---
+
+## 2. Pack layout
+
+```
+cyno_repro_pack/
+├── REPRODUCIBILITY_RUNBOOK.md   ← this file
+├── RECOVERY.md                  ← 4-step post-refresh quick start
+├── ENVIRONMENT.md               ← Python/NumPy versions, seed, no-network note
+├── MANIFEST.md                  ← SHA-256 checksums + acceptance (expected) table
+├── code/                        ← NumPy-only re-implementation (the durable artifact)
+│   ├── stats_numpy.py           ← ranks, Spearman, Mann-Whitney, Cliff's δ, OLS, t-p
+│   ├── family_lib.py            ← shared seeded engine for the family-dispersion analysis
+│   ├── tier1_1_paralog_outliers.py
+│   ├── tier1_1b_family_dispersion_sweep.py   ← identity sweep 20–80
+│   ├── tier1_2_repeat_class.py
+│   ├── tier1_4_seq_regression.py
+│   ├── tier1_5_corum_membership.py
+│   ├── tier1_6_stoich_regul.py
+│   ├── fig_repeat_class.py      ← Fig_repeat_class_halflife_rev.png (days)
+│   ├── fig_seq_features.py      ← Fig_seq_features_rev.png (days)
+│   ├── fig_family_dispersion.py ← Fig_family_dispersion_threshold_sweep_rev.png (seeded)
+│   ├── fig_identity_boxplot.py  ← Fig_identity_vs_halflife_boxplot_rev.png (+ Kruskal–Wallis)
+│   └── run_all.py               ← runs every tier + prints expected vs recomputed
+├── data/
+│   ├── inputs/                  ← pinned raw inputs (wiped on refresh otherwise)
+│   │   ├── cyno_target_rev.tsv        (cohort, n = 3,514)
+│   │   ├── cyno_target_rev.fasta
+│   │   ├── corum_humanComplexes.txt   (CORUM 5.x, Human)
+│   │   └── cyno_pairs.tsv             (DIAMOND all-vs-all)
+│   ├── snapshots/              ← FROZEN external-data captures (no live fetch needed)
+│   │   ├── seq_features_rev.tsv            (UniProt-derived features per protein)
+│   │   ├── Repeat_class_halflife_rev.tsv   (UniProt domain → repeat class)
+│   │   ├── corum_member_table_rev.tsv      (member / non-member, promiscuity)
+│   │   ├── corum_strat_assignment_rev.tsv  (NONE/STOICH/REGUL/BOTH)
+│   │   ├── corum_complex_stats_rev.tsv     (the 481-complex set, per-complex SD)
+│   │   └── pair_table_rev.tsv              (11,527 evaluated paralog pairs)
+│   └── expected/              ← acceptance targets (the published rev outputs)
+└── results/                    ← regenerated by run_all.py (compare to expected/)
+```
+
+The **snapshots** are the key idea: they capture the live UniProt / domain / CORUM
+state from the original run, so the pipeline is reproduced **offline and date-stable**.
+
+---
+
+## 3. How to reproduce after a refresh
+
+See `RECOVERY.md` for the short version. In full:
+
+1. Re-open Cowork; the pack is in your OneDrive `Documents/Cowork`. Upload the
+   whole `cyno_repro_pack/` folder back into the session (or point Copilot at it).
+2. `cd code && python3 run_all.py` (no network needed; NumPy only).
+3. Compare `results/` to `data/expected/` and to the acceptance table in
+   `MANIFEST.md`. Deterministic tiers must match to the stated precision; the one
+   permutation p must land within Monte-Carlo error.
+4. To run a **new species** (Tier 1-7 prep), see §6.
+
+---
+
+## 4. Per-tier reproduction status
+
+Validated in-sandbox against the pinned `data/expected/` files. "Exact" means the
+recomputed value equals the published value to the reported precision.
+
+| Tier | Headline result | Reproduction status |
+|---|---|---|
+| **1-1** Paralog outliers | top pair Srsf6/Srsf4, fold 9.22 | **Exact (31/31)** — from the frozen evaluated-pairs table `pair_table_rev.tsv` + two recovered rules (see note below). A *naive* re-run from raw DIAMOND diverges (24–35); the saved table is the key. |
+| **1-1b** Family dispersion sweep | sequence-similar paralogs are co-stable (perm P < 1e-3) | **Exact on every deterministic column** (families, proteins-in-families, within-family SD) as of 2026-08-31; identity sweep extended to **20, 30, 40, 50, 60, 70, 80**. From `pair_table_rev.tsv` (connected components, cov ≥ 50%, size ≥ 3). Recovered details: graph from the curated pair table (not raw DIAMOND), within-family SD uses **population SD (ddof = 0)**, and composite gene names are normalised (§9). `random_SD`/`perm_p` remain Monte-Carlo (seed = 42). |
+| **1-2** Repeat-class | ALL_REPEAT n=148, **p = 1.984e-2** | **Exact** — every family n, median, percentiles, and p reproduced. |
+| **1-3** GO comparison | (BH-FDR over GO terms) | **DESCOPED (2026-08-31)** — not required for the programme; no longer a reproducibility gap. Outputs were never saved and it would need a live UniProt-GOA snapshot. |
+| **1-4** Sequence regression | whole-model **R² = 0.0190**; pI β=+0.0380, p=1.07e-9 | **Exact** — R², every β, SE, p, and all four Spearman ρ reproduced. |
+| **1-5** CORUM membership | within-complex perm **p = 0.63**; member vs non-member null | **Exact (deterministic) + within MC error (permutation)** — members 1442 / non 2072, medians 7.69/8.77, MW p=7.3e-6, 481 complexes, observed SD 1.0702, random 1.0632 (pub 1.0630), perm p 0.631 (pub 0.6271). |
+| **1-6** STOICH vs REGUL | **STOICH vs REGUL p = 0.92** | **Exact** — class sizes 127/1132/183/2072, all medians, and every Mann-Whitney p reproduced. |
+
+**Bottom line:** every statistical tier (1-1, 1-2, 1-4, 1-5, 1-6) reproduces from
+this pack — the null findings that motivate Tier 1-7 (sequence, complex, and
+structural-complex predictors all fail) hold exactly. Tier 1-3 (GO) is **descoped**
+as of 2026-08-31 and is no longer tracked as a gap.
+
+### Three reproducibility lessons this pack made concrete
+- **Tier 1-4 feature set** — must come from the frozen `seq_features_rev.tsv`, not
+  the prose feature list, to land on R² = 0.0190.
+- **Tier 1-5 permutation pool** — the size-matched null draws from the **whole
+  cohort (3,514)**, not the 1,442 members. Member pool → null 1.073, p≈0.44;
+  whole-cohort pool → 1.063, p≈0.63 (matching 0.6271). One unstated choice.
+- **Tier 1-1 needs the saved intermediate + a cohort-version fix.** Rebuilding the
+  pair table from raw DIAMOND diverges (24–35 pairs) because the coverage/HSP/
+  best-hit rules aren't in the prose. The original `pair_table_rev.tsv` (11,527
+  evaluated pairs with pident/cov_min/Δlog2) was however saved — and it was built
+  on the **pre-dedup 3,515-row cohort**, so it still carries the ambiguous
+  `Mrc1;Slc39A12` composite. Re-applying the rev-cohort gene filter drops exactly
+  that stale self-pair, and `pident≥80 + 2-fold + cov_min≥0.5` then yields exactly
+  the 31 published pairs. *Nothing in the data changed* — the apparent
+  non-reproducibility was a stale intermediate + an unrecorded coverage cutoff.
+
+---
+
+## 5. External dependencies and how they are pinned
+
+| Dependency | Original source | How it is frozen here |
+|---|---|---|
+| Half-life cohort (n=3,514) | derived from `Monkey_half-life.xlsx` | `data/inputs/cyno_target_rev.tsv` (the **derived** cohort, after dropping the ambiguous `Mrc1;Slc39A12` row, 3,515→3,514) |
+| UniProt sequence features | live UniProt at run time | `data/snapshots/seq_features_rev.tsv` |
+| Repeat-domain class | live UniProt domains | `data/snapshots/Repeat_class_halflife_rev.tsv` |
+| CORUM complexes | CORUM 5.x, Human | raw file **NOT redistributed** (licence unclear; no script reads it). Only the derived tables are shipped, incl. the collapsed 481-complex set `corum_complex_stats_rev.tsv`. SHA-256 of the file used: `5e40556e…2e0282` |
+| DIAMOND paralog pairs | DIAMOND all-vs-all (binary not in sandbox) | raw `data/inputs/cyno_pairs.tsv` **and** the evaluated-pairs intermediate `data/snapshots/pair_table_rev.tsv`. As of 2026-08-31 the intermediate is also **rebuildable from the raw file** by `build_pair_table.py` — see §10 |
+| GO terms (Tier 1-3) | live UniProt-GOA | **not captured — DESCOPED**, no longer required |
+| DisGeNET/OMIM (Tier 1-1 disease tags) | live | not captured; not required for the null findings |
+
+**Gap to close for full coverage:** record the CORUM release + UniProt release
+dates for the frozen snapshots. (The former UniProt-GOA gap is closed by
+descoping Tier 1-3.)
+
+**Upstream now covered:** the half-life workbook `Monkey_half-life.xlsx` is pinned
+as `data/inputs/Monkey_half-life.xlsx` and `code/build_cohort.py` rebuilds
+`cyno_target_rev.tsv` from it byte-identically. See §8.
+
+---
+
+## 6. Running a new species (Tier 1-7 prep)
+
+The pack reproduces the *cyno* result. For mouse/rat, supply the same-format
+inputs and the pipeline re-runs:
+
+1. `input/<species>_target.tsv` — columns `gene, alias, accession, length,
+   half_life_h` (see v1 §1.1). **Now scripted:** `code/build_cohort.py` builds this
+   from the raw half-life workbook plus a gene→accession FASTA. Run it with
+   `--xlsx/--fasta/--out --no-verify` for a new species. See §8.
+2. `input/corum_humanComplexes.txt` — reuse the pinned copy for cross-species
+   ortholog mapping (uppercase gene symbol key).
+3. `input/<species>_pairs.tsv` — DIAMOND all-vs-all, produced **outside** the
+   sandbox (DIAMOND is not installable here).
+4. For new species, snapshots cannot be reused — UniProt features / domains / GO
+   must be fetched live (needs network) and then **frozen** the same way, so the
+   species result becomes reproducible in turn.
+
+---
+
+## 7. Reproducibility rules (carried from v1, now enforced in code)
+
+- All permutation statistics use `numpy.default_rng(42)`.
+- Statistics depend on **NumPy only**; the custom rank / Mann-Whitney / Spearman /
+  OLS / t-p implementations in `stats_numpy.py` are authoritative (do not swap in SciPy).
+- Half-life is handled internally in **hours**; figures/legends convert to days
+  (day = h/24). `log2` for effect sizes, `log10` for correlations.
+- Redundant / peptide-ambiguous rows (e.g. `Mrc1;Slc39A12`) are excluded by
+  accession; only confident gene assignments are used (rev cohort: 3,515 → 3,514).
+- Cross-species comparisons key on **uppercase gene symbol**, with UniProt
+  accession as the secondary key.
+
+---
+
+## 8. Upstream data prep — `build_cohort.py` (added 2026-08-31)
+
+The last unscripted stage is now closed. `code/build_cohort.py` rebuilds
+`data/inputs/cyno_target_rev.tsv` from `data/inputs/Monkey_half-life.xlsx`
+**byte-identically** (verified). Standard library only — the .xlsx is parsed with
+`zipfile` + `xml.etree`, so neither openpyxl nor pandas is required.
+
+**What the workbook holds.** Sheet1, 3 columns, 3,515 data rows: `Gene Name`
+(may be a semicolon-joined composite), `Entry` (a **mouse** UniProt accession —
+*not* used, the cohort is keyed on the cyno ortholog; empty for every composite),
+and `Monkey` (half-life in hours).
+
+**Where accession/length come from.** Both are cyno values that originally came
+from a live UniProt ortholog lookup. That lookup is frozen as
+`data/inputs/cyno_target_rev.fasta` (`>gene|accession`, sequence length =
+`length`) — the same snapshot pattern used elsewhere in the pack. No network.
+
+**The dedup rule (3,515 → 3,514), recovered and now enforced in code.** The
+workbook holds **seven** semicolon composites and only **one** is dropped, so the
+rule is emphatically *not* "drop composite gene names":
+
+| Row | Fate |
+|---|---|
+| `H2Ac12;H2Ac7;H2Ac14;H2Ac17;H2Aj` | kept → `H2AC12` |
+| `H2Bc17;H2Bc11;H2Bc21` | kept → `H2BC17` |
+| `H2Bc5;H2Bc18;H2Bc15;H2Bc12L` | kept → `H2BC5` |
+| `Magohb;Magoh` | kept → `MAGOHB` |
+| `Rack1;Gnb2L1` | kept → `RACK1` |
+| `Snrpb;Snrpn` | kept → `SNRPB` |
+| `Mrc1;Slc39A12` | **DROPPED** |
+
+The runbook's phrase "excluded by accession" is literally the rule:
+
+```
+Mrc1           -> A0A2K5TN91   (half-life  5.996546499 h)
+Mrc1;Slc39A12  -> A0A2K5TN91   (half-life 15.40101596  h)   <-- same protein
+```
+
+`Mrc1` is present as its own confident row, so the composite is a **redundant
+second measurement of the same cyno protein**. The six kept composites each
+resolve to an accession no other row claims, so nothing collides.
+
+Corroboration from a frozen snapshot: `data/snapshots/pair_table_rev.tsv` (built
+on the pre-dedup 3,515-row cohort) contains
+`Mrc1  Mrc1_Slc39A12  pident=100.00  cov_min=1.000` — a 100 % identity,
+full-coverage **self-pair**. That is the stale self-pair the runbook blames for
+the Tier 1-1 divergence.
+
+> **RULE** — resolve every row to its cyno accession; where several rows share one
+> accession, keep the **confident (non-composite)** gene assignment and drop the
+> ambiguous composite(s).
+
+Because the frozen FASTA is post-dedup, it cannot by itself demonstrate the
+collision, so `PREDEDUP_ACCESSIONS` in the script pins the composite's resolution
+(recovered from the self-pair) to keep the rule firing and auditable.
+
+**Output format**, byte-exact: workbook row order (already alphabetical);
+`chosen_alias` = first gene before `;`, uppercased; `half_life_h` = Python
+`repr()` of the float (full precision, no rounding); LF endings with a trailing
+newline.
+
+---
+
+## 9. Gene-name normalisation — a real bug fixed (2026-08-31)
+
+The pair table joins composite gene names with `_` (`Rack1_Gnb2L1`) while the
+cohort tsv uses `;` (`Rack1;Gnb2L1`). A naive `gene in cohort` membership test
+therefore **silently drops every pair touching a composite cohort gene**.
+
+Five pair-table names are affected: `H2Ac12_H2Ac7_H2Ac14_H2Ac17_H2Aj`,
+`H2Bc17_H2Bc11_H2Bc21`, `H2Bc5_H2Bc18_H2Bc15_H2Bc12L`, `Rack1_Gnb2L1`, and
+`Mrc1_Slc39A12` (the last correctly stays out — it is the dedup-dropped row).
+
+This was the cause of the unexplained Kruskal–Wallis gap in the identity boxplot:
+
+| | pairs | H |
+|---|---|---|
+| naive lookup (as shipped) | 5,302 | 86.59 |
+| **normalised lookup (fixed)** | **5,312** | **87.99 → matches stored 88.0** |
+
+`fig_identity_boxplot.py` now normalises and reproduces the stored H.
+
+**The stored p was separately stale.** The annotation read `H=88.0, p≈1.6e-15`,
+but those two are mutually inconsistent: the chi-square survival function at
+df = 4 maps H = 88.0 to **p = 3.5e-18**; p = 1.6e-15 would require H ≈ 75.45.
+The correct value for this figure is **H = 87.99, p = 3.52e-18**.
+
+### RESOLVED (2026-08-31) — normalisation adopted pack-wide
+
+The normalised lookup was **adopted as the scientifically correct behaviour** and
+is now applied consistently in `family_lib.add_composite_aliases()`, used by
+Tier 1-1, Tier 1-1b and both paralog figures.
+
+**This turned out to close a discrepancy the pack had previously misdiagnosed.**
+The Tier 1-1b entry in §4 used to carry the caveat *"proteins-in-families differ
+by ≤ 1 at low identity (stored graph carried one extra near-boundary edge)"*.
+There was no near-boundary edge. The published
+`data/expected/Table_family_threshold_sweep_rev.tsv` had **always** held the
+normalised counts; the naive lookup simply could not reach them:
+
+| identity | published (expected) | naive lookup | normalised lookup |
+|---|---|---|---|
+| ≥30 | 923 proteins, SD 0.211 | 922, 0.211 ❌ | **923, 0.211 ✅** |
+| ≥50 | 321 proteins, SD 0.152 | 320, 0.150 ❌ | **321, 0.152 ✅** |
+| ≥60 | 202 proteins, SD 0.138 | 201, 0.138 ❌ | **202, 0.138 ✅** |
+| ≥70 | 103 proteins, SD 0.097 | 103, 0.097 ✅ | **103, 0.097 ✅** |
+| ≥80 | 37 proteins, SD 0.139 | 37, 0.139 ✅ | **37, 0.139 ✅** |
+
+Tier 1-1b now reproduces the published table **exactly on every deterministic
+column**. The original run had normalised all along; only the re-implementation
+had not.
+
+`random_SD` and `perm_p` stay Monte-Carlo. Note they are also sensitive to family
+**ordering**: `null_sds()` cycles the family-size array with `np.resize(sizes,
+n_sets)`, so a change in the order `build_families()` emits families shifts how
+the seeded stream is consumed. This is why `random_SD` moves slightly even at
+≥70/≥80, where family and protein counts are unchanged. Conclusions are
+unaffected (every threshold 20–70 stays at perm P < 1e-3; ≥80 moved 0.0116 →
+0.0094, published 0.0084).
+
+### Follow-up fix (same day) — the alias approach contaminated the null pool
+
+The first implementation added alias keys directly to the cohort dict
+(`add_composite_aliases(hl)` inside `family_lib.load()`). That made membership
+tests correct but **inflated the cohort dict from 3,514 to 3,520 entries**, so
+`hl.values()` — which Tier 1-1b and `fig_family_dispersion.py` use as the
+size-matched **random sampling pool** — carried 6 duplicated half-lives.
+
+Deterministic results were unaffected (families, proteins-in-families and
+within-family SD still matched the published table), but the *null* was
+contaminated.
+
+Corrected by resolving names instead of aliasing them: `family_lib.canonical()`
+maps a pair-table gene onto its cohort spelling, and `build_families()` applies
+it, so `load()` returns a clean one-entry-per-protein cohort (n = 3,514). The
+null pool is exact again, and Monte-Carlo agreement with the published table
+visibly improved — `random_SD` at ≥70 (0.245) and ≥80 (0.247) now match the
+published values exactly.
+
+`add_composite_aliases()` is retained for **membership lookup only** and carries
+a warning in its docstring. Tier 1-1 uses it safely because it only does per-pair
+lookups and never builds a pool or a count from it.
+
+> Lesson: a dict used for BOTH membership and value-pooling must never be given
+> alias keys. Resolve names to a canonical form instead.
+
+**Tier 1-1 is unaffected**: the outlier set is still exactly 31 pairs and
+`Outlier_pairs_id80_2fold_rev.tsv` is byte-identical. No composite-gene pair
+clears `pident ≥ 80 + 2-fold + cov_min ≥ 0.5`. The dedup-dropped
+`Mrc1;Slc39A12` remains excluded under both spellings, so the stale self-pair
+stays filtered.
+
+---
+
+## 10. The pair-table rule, recovered (2026-08-31)
+
+§4 and §5 recorded that rebuilding the pair table from raw DIAMOND "diverges
+(24–35 pairs) because the coverage/HSP/best-hit rules aren't in the prose", which
+made Tier 1-1 dependent on the frozen intermediate and blocked new species
+outright. **The rule has now been recovered by exhaustive search against the
+frozen table.**
+
+| HSP-selection rule | pident columns correct | cov_min correct |
+|---|---|---|
+| max bitscore | 8,128 / 11,526 | 8,381 |
+| min e-value | 8,153 | 8,385 |
+| first in file | 8,696 | 9,011 |
+| max coverage / max aln length | 7,041 | 7,255 |
+| **max percent identity** | **11,526 / 11,526** | **11,526** |
+
+The complete rule, now implemented in `code/build_pair_table.py`:
+
+- unordered gene pair; self-hits dropped
+- keep the HSP with the **maximum percent identity**
+- `cov_min = aln_length / min(qlen, slen)` — coverage against the **shorter** sequence
+- `abs_dlog2_t = |log2(h1 / h2)|`
+
+Validation (`python3 build_pair_table.py --validate`): the unordered pair set
+reconstructs exactly (11,526 pairs, 0 extra, 0 missing) and **every** `pident`,
+`cov_min` and `abs_dlog2_t` matches the frozen snapshot. Rebuilding against the
+rev cohort yields 11,522 rows — the 4 missing rows are the stale pre-dedup
+`Mrc1_Slc39A12` entries, which Tier 1-1 filters anyway. Running Tier 1-1 on a
+table rebuilt from raw DIAMOND returns **exactly the 31 published pairs** with
+the same top pair (Srsf6/Srsf4, fold 9.22).
+
+**Consequence:** the pipeline is now reproducible **end to end from raw inputs**
+— workbook → cohort (`build_cohort.py`) → pair table (`build_pair_table.py`) →
+Tier 1-1 / 1-1b. The frozen `pair_table_rev.tsv` is retained for provenance but
+is no longer load-bearing, and an arbitrary species can now be processed.

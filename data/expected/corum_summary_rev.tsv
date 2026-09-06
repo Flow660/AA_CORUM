@@ -1,0 +1,10 @@
+analysis	label	n	stat	p
+member_vs_nonmember	CORUM_member	1442	median_h=7.6920	NA
+member_vs_nonmember	non_member	2072	median_h=8.7744	NA
+member_vs_nonmember	MW_U	3514	1361246.0	7.3099e-06
+member_vs_nonmember	cliffs_delta	3514	-0.0888	NA
+within_complex_SD	observed_mean	481	1.0702	NA
+within_complex_SD	random_mean	481	1.0630	NA
+within_complex_SD	permutation_p	10000	p<=1e-04	6.2710e-01
+promiscuity_vs_halflife	spearman_rho	1442	-0.0556	3.4656e-02
+complex_size_vs_halflife	spearman_rho	481	-0.0774	8.9767e-02

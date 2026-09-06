@@ -1,0 +1,18 @@
+analysis	label	n	stat	p
+spearman	length (log10)	3514	-0.0633	1.7208e-04
+spearman	pI	3514	0.1083	1.1801e-10
+spearman	disorder_frac	3514	-0.0511	2.4500e-03
+spearman	PEST_max	3514	-0.1008	2.0689e-09
+nend_median	STAB	3460	8.3476	NA
+nend_median	TYPE2	22	8.2679	NA
+nend_median	TYPE1	19	13.9939	NA
+nend_median	NDEG	13	14.8397	NA
+OLS_beta	intercept	3514	0.9232	0.0000e+00
+OLS_beta	log_len	3514	-0.0051	4.0427e-01
+OLS_beta	pI	3514	0.0380	1.0700e-09
+OLS_beta	disorder	3514	-0.0294	1.1070e-06
+OLS_beta	pest_max	3514	-0.0028	6.4601e-01
+OLS_beta	nend_TYPE1	3514	0.1628	4.4117e-02
+OLS_beta	nend_TYPE2	3514	0.0143	8.4796e-01
+OLS_beta	nend_NDEG	3514	0.1933	4.6770e-02
+OLS_R2	whole_model	3514	0.0190	NA
