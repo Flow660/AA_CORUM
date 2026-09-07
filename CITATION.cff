@@ -14,7 +14,7 @@ authors:
     affiliation: "Preclinical Biomarkers, Takeda Pharmaceutical Company Limited"
     # orcid: "https://orcid.org/0000-0000-0000-0000"   # TODO add ORCID
 # TODO: add remaining authors before submission.
-license: MIT
+license: BSD-3-Clause
 keywords:
   - proteomics
   - protein half-life
