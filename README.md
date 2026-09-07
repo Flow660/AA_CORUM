@@ -131,7 +131,7 @@ needed.**
 | Path | Files | Why it must be committed |
 |---|---|---|
 | `README.md` | 1 | This file |
-| `LICENSE` | 1 | Reuse terms for the code |
+| `LICENSE` | 1 | BSD 3-Clause — reuse terms for the code |
 | `CITATION.cff` | 1 | Machine-readable citation for GitHub/Zenodo |
 | `requirements.txt` | 1 | Pins the runtime |
 | `.gitignore` | 1 | Keeps regenerated output out of history |
@@ -350,9 +350,9 @@ a self-pair, which is the corroborating evidence.
 
 ## Data provenance and licensing
 
-The **code** is released under the terms in `LICENSE`. Third-party data
-redistributed here keeps its own terms — **verify these before making the
-repository public**:
+The **code** is released under the **BSD 3-Clause** licence (`LICENSE`).
+Third-party data redistributed here keeps its own terms — **verify these before
+making the repository public**:
 
 | Data | Source | Note |
 |---|---|---|
@@ -521,5 +521,9 @@ repository (tag a release and archive it via Zenodo so it carries a DOI).
 
 ## License
 
-Code: see `LICENSE`. Third-party data retains its original terms — see
-**Data provenance and licensing**.
+Code: **BSD 3-Clause** — see `LICENSE`. Note clause 3: the name of the copyright
+holder and of contributors may not be used to endorse or promote derived products
+without prior written permission.
+
+Third-party data retains its original terms — see **Data provenance and
+licensing**.
